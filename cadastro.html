@@ -1163,6 +1163,29 @@ function saveUserData(name, email, event_id) {
           content_name: 'Cadastro INSS Maternidade',
           content_category: 'Formulário Finalizado'
         }, { eventID: event_id });
+        // === Envio CAPI (Meta API de Conversão) ===
+        fetch("https://capi-api.onrender.com/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            event_name: "CompleteRegistration",
+            event_id: event_id,
+            event_source_url: window.location.href,
+            user: {
+            name: name,
+            email: email,
+            fbp: getCookie("_fbp") || "",
+            fbc: getCookie("_fbc") || ""
+            },
+            custom_data: {
+            content_name: "Cadastro INSS Maternidade",
+            content_category: "Formulário Finalizado"
+            }
+        })
+        })
+        .then(r => r.json())
+        .then(j => console.log("📡 CAPI response:", j))
+        .catch(err => console.error("❌ Erro CAPI:", err));
         console.log('✅ CompleteRegistration fired, event_id:', event_id);
       } catch (err) {
         console.warn('fbq.track error', err);

@@ -8,20 +8,26 @@
 
     <link rel="icon" type="image/x-icon" href="icone.png">
     
-    <!-- PIXEL DO FACEBOOK -->
-    <script>
-        !function(f,b,e,v,n,t,s)
-        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-        n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t,s)}(window, document,'script',
-        'https://connect.facebook.net/en_US/fbevents.js');
-        
-        fbq('init', 'SEU_PIXEL_ID'); // SUBSTITUA AQUI
-        fbq('track', 'PageView');
-    </script>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+
+fbq('init', '807233935229656'); // <- seu Pixel ID
+fbq('track', 'PageView');
+console.log('📊 Pixel PageView ativo - ID 807233935229656');
+</script>
+<noscript>
+  <img height="1" width="1" style="display:none"
+       src="https://www.facebook.com/tr?id=807233935229656&ev=PageView&noscript=1"/>
+</noscript>
+<!-- End Meta Pixel Code -->
 
 
 
@@ -1002,154 +1008,178 @@
 
 
 
-   <script>
+<!-- === INÍCIO: SCRIPT CONSOLIDADO PARA cadastro.html === -->
+<script>
+/* CONFIG */
+const PIXEL_ID = '807233935229656';   // já iniciado no head
+const SUCCESS_PAGE = 'obrigado.html';
 
+/* HELPERS */
+function generateEventID() {
+  return 'evt_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+}
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return '';
+}
+function saveUserData(name, email, event_id) {
+  const fbp = getCookie('_fbp') || '';
+  const fbc = getCookie('_fbc') || '';
+  const data = { name, email, event_id, fbp, fbc, timestamp: new Date().toISOString() };
+  try { localStorage.setItem('userData', JSON.stringify(data)); } catch(e){}
+  console.log('💾 Saved userData', data);
+}
 
+/* INITIATE CHECKOUT: dispara apenas 1 vez no primeiro input significativo */
+(function initInitiateCheckout() {
+  let initiated = false;
+  document.addEventListener('input', function onInput(e) {
+    const target = e.target;
+    if (!target || !target.classList || !target.classList.contains('form-input')) return;
+    if (initiated) return;
+    if (typeof fbq === 'undefined') { console.warn('fbq not ready'); return; }
+    initiated = true;
+    const event_id = generateEventID();
+    try {
+      fbq('track', 'InitiateCheckout', {
+        content_name: 'Formulário de Cadastro - INSS Maternidade',
+        content_category: 'Cadastro'
+      }, { eventID: event_id });
+    } catch(err){ console.warn('fbq error', err); }
+    localStorage.setItem('event_id_initiate', event_id);
+    console.log('🎯 InitiateCheckout fired, event_id:', event_id);
+    document.removeEventListener('input', onInput);
+  }, { capture: true });
+})();
 
-
-  // ===== CONFIGURAÇÕES =====
-  const PIXEL_ID = 'SEU_PIXEL_ID'; // Substitua pelo seu ID real
-  const SUCCESS_PAGE = 'obrigado.html'; // Página de sucesso
-
-
-
-  // ===== ELEMENTOS DOM =====
+/* FORM HANDLING (validação + CompleteRegistration) */
+(function initForm() {
   const form = document.getElementById('registrationForm');
-  const progressContainer = document.getElementById('progressContainer');
-  const progressFill = document.getElementById('progressFill');
-  const progressText = document.getElementById('progressText');
-  const successAnimation = document.getElementById('successAnimation');
   const submitButton = document.getElementById('submitButton');
+  const progressContainer = document.getElementById('progressContainer');
+  const successAnimation = document.getElementById('successAnimation');
 
-  // Criar o elemento "benefitsSection" se não existir, para evitar erro
-  let benefitsSection = document.getElementById('benefitsSection');
-  if (!benefitsSection) {
-      benefitsSection = document.createElement('div');
-      benefitsSection.id = 'benefitsSection';
-      benefitsSection.style.display = 'none';
-      document.body.appendChild(benefitsSection);
-  }
-
-  // ===== CAMPOS DO FORMULÁRIO =====
+  // Campos e validações - mantém sua lógica
   const fields = {
-      fullName: document.getElementById('fullName'),
-      email: document.getElementById('email'),
-      password: document.getElementById('password'),
-      confirmPassword: document.getElementById('confirmPassword')
+    fullName: document.getElementById('fullName'),
+    email: document.getElementById('email'),
+    password: document.getElementById('password'),
+    confirmPassword: document.getElementById('confirmPassword')
   };
-
-  // ===== VALIDAÇÕES =====
   const validators = {
-      fullName: (v) => v && v.length >= 3 && /\s/.test(v),
-      email: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-      password: (v) => v && v.length >= 6,
-      confirmPassword: (v) => v === fields.password.value
+    fullName: v => v && v.trim().length >= 3 && /\s/.test(v),
+    email: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    password: v => v && v.length >= 6,
+    confirmPassword: v => v === fields.password.value
   };
 
-  // ===== INICIALIZAÇÃO =====
+  // Inicialização (mesma sua lógica)
   document.addEventListener('DOMContentLoaded', () => {
-      setupEventListeners();
-      if (progressContainer) progressContainer.classList.add('active');
-      if (benefitsSection) benefitsSection.classList.add('active');
+    if (progressContainer) progressContainer.classList.add('active');
+    // attach events
+    Object.keys(fields).forEach(name => {
+      const f = fields[name];
+      if(!f) return;
+      f.addEventListener('input', () => { validateField(name); updateProgress(); if(name==='password') updatePasswordStrength(); });
+      f.addEventListener('focus', () => { clearFieldError(name); });
+      f.addEventListener('blur', () => { validateField(name); });
+    });
+    if (form) form.addEventListener('submit', onSubmit);
   });
 
-  function setupEventListeners() {
-      Object.keys(fields).forEach(fieldName => {
-          const field = fields[fieldName];
-          if (!field) return;
-
-          field.addEventListener('input', () => {
-              validateField(fieldName);
-              updateProgress();
-              if (fieldName === 'password') updatePasswordStrength();
-          });
-
-          field.addEventListener('focus', () => clearFieldError(fieldName));
-          field.addEventListener('blur', () => validateField(fieldName));
-      });
-
-      if (form) form.addEventListener('submit', handleSubmit);
+  function validateField(name) {
+    const f = fields[name];
+    const group = document.getElementById(name + 'Group');
+    if (!f || !group) return false;
+    const ok = !!(validators[name] && validators[name](f.value));
+    group.classList.toggle('valid', ok);
+    group.classList.toggle('error', !ok);
+    return ok;
   }
-
-  function validateField(fieldName) {
-      const field = fields[fieldName];
-      if (!field) return false;
-      const group = document.getElementById(fieldName + 'Group');
-      if (!group) return false;
-
-      const isValid = validators[fieldName](field.value);
-      group.classList.toggle('error', !isValid);
-      group.classList.toggle('valid', isValid);
-      return isValid;
+  function clearFieldError(name) {
+    const group = document.getElementById(name + 'Group');
+    if (group) group.classList.remove('error');
   }
-
-  function clearFieldError(fieldName) {
-      const group = document.getElementById(fieldName + 'Group');
-      if (group) group.classList.remove('error');
-  }
-
   function updateProgress() {
-      const total = Object.keys(fields).length;
-      let valid = 0;
-      Object.keys(fields).forEach(f => {
-          if (fields[f] && validators[f](fields[f].value)) valid++;
-      });
-      const progress = (valid / total) * 100;
-      if (progressFill) progressFill.style.width = progress + '%';
-      if (progressText) progressText.textContent = `Progresso: ${Math.round(progress)}%`;
+    const total = Object.keys(fields).length;
+    let valid = 0;
+    Object.keys(fields).forEach(k => { if (fields[k] && validators[k] && validators[k](fields[k].value)) valid++; });
+    const pct = Math.round((valid / total) * 100);
+    const pf = document.getElementById('progressFill');
+    const pt = document.getElementById('progressText');
+    if (pf) pf.style.width = pct + '%';
+    if (pt) pt.textContent = `Progresso: ${pct}%`;
   }
-
   function updatePasswordStrength() {
-      const pw = fields.password.value;
-      const strengthFill = document.getElementById('strengthFill');
-      const strengthText = document.getElementById('strengthText');
-      if (!strengthFill || !strengthText) return;
-      let strength = 0;
-      if (pw.length >= 6) strength += 25;
-      if (pw.length >= 10) strength += 25;
-      if (/[A-Z]/.test(pw)) strength += 25;
-      if (/[0-9]/.test(pw)) strength += 25;
-      strengthFill.style.width = strength + '%';
-      strengthText.textContent = `Força: ${strength <= 25 ? 'Fraca' : strength <= 50 ? 'Média' : 'Forte'}`;
+    const pw = fields.password.value || '';
+    const sf = document.getElementById('strengthFill');
+    const st = document.getElementById('strengthText');
+    if (!sf || !st) return;
+    let score = 0;
+    if (pw.length >= 6) score += 25;
+    if (pw.length >= 10) score += 25;
+    if (/[A-Z]/.test(pw)) score += 25;
+    if (/\d/.test(pw)) score += 25;
+    sf.style.width = score + '%';
+    st.textContent = `Força: ${score <= 25 ? 'Fraca' : score <= 50 ? 'Média' : 'Forte'}`;
   }
 
-  function handleSubmit(e) {
-      e.preventDefault();
+  // Submissão: valida e dispara CompleteRegistration uma única vez (com event_id)
+  let registrationFired = false;
+  function onSubmit(e) {
+    e.preventDefault();
+    // valida tudo
+    let ok = true;
+    Object.keys(fields).forEach(k => { if (!validateField(k)) ok = false; });
+    if (!ok) { console.warn('Validation failed'); return; }
+    // bloqueia dupla submissão
+    if (registrationFired) return;
+    registrationFired = true;
 
-      let valid = true;
-      Object.keys(fields).forEach(f => { if (!validateField(f)) valid = false; });
-      if (!valid) return;
+    // UI
+    submitButton.classList.add('loading');
+    submitButton.disabled = true;
+    const btnText = submitButton.querySelector('.button-text');
+    if (btnText) btnText.textContent = 'Criando Conta...';
 
-      startLoading();
-      setTimeout(completeRegistration, 2000);
+    // prepara dados
+    const name = fields.fullName.value.trim();
+    const email = fields.email.value.trim();
+    const event_id = generateEventID();
+
+    // salva local para dedupe/capi
+    saveUserData(name, email, event_id);
+
+    // dispara CompleteRegistration (client pixel) com eventID
+    if (typeof fbq !== 'undefined') {
+      try {
+        fbq('track', 'CompleteRegistration', {
+          content_name: 'Cadastro INSS Maternidade',
+          content_category: 'Formulário Finalizado'
+        }, { eventID: event_id });
+        console.log('✅ CompleteRegistration fired, event_id:', event_id);
+      } catch (err) {
+        console.warn('fbq.track error', err);
+      }
+    } else {
+      console.warn('fbq undefined at submit');
+    }
+
+    // opcional: enviar ao seu servidor CAPI aqui via fetch (se já tiver)
+    // fetch('/event', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({event:'CompleteRegistration', event_id, name, email})});
+
+    // animação + redirect
+    if (form) form.style.display = 'none';
+    if (progressContainer) progressContainer.style.display = 'none';
+    if (successAnimation) successAnimation.style.display = 'block';
+    setTimeout(() => { window.location.href = SUCCESS_PAGE; }, 2500);
   }
-
-  function startLoading() {
-      submitButton.classList.add('loading');
-      submitButton.disabled = true;
-      const text = submitButton.querySelector('.button-text');
-      if (text) text.textContent = 'Criando Conta...';
-  }
-
-  function completeRegistration() {
-      if (form) form.style.display = 'none';
-      if (progressContainer) progressContainer.style.display = 'none';
-      if (benefitsSection) benefitsSection.style.display = 'none';
-      if (successAnimation) successAnimation.style.display = 'block';
-
-      const userData = {
-          name: fields.fullName.value,
-          email: fields.email.value,
-          registrationDate: new Date().toISOString()
-      };
-      localStorage.setItem('userData', JSON.stringify(userData));
-
-      // Aguarda 3s e redireciona
-      setTimeout(() => {
-          window.location.href = SUCCESS_PAGE;
-      }, 3000);
-  }
+})();
 </script>
+<!-- === FIM: SCRIPT CONSOLIDADO === -->
+
 
 </body>
 </html>

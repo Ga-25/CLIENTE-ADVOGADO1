@@ -8,28 +8,25 @@
 
      <link rel="icon" type="image/x-icon" href="icone.png">
     
-    <!-- PIXEL DO FACEBOOK -->
-    <script>
-        !function(f,b,e,v,n,t,s)
-        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-        n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t,s)}(window, document,'script',
-        'https://connect.facebook.net/en_US/fbevents.js');
-        
-        fbq('init', 'SEU_PIXEL_ID'); // SUBSTITUA AQUI
-        fbq('track', 'PageView');
-        
-        // Event de Purchase - conversão final
-        fbq('track', 'Purchase', {
-            content_name: 'Cadastro Confirmado - INSS Maternidade',
-            content_category: 'Registration Success',
-            value: 2000.00,
-            currency: 'BRL'
-        });
-    </script>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+
+fbq('init', '807233935229656'); // <- seu Pixel ID
+fbq('track', 'PageView');
+</script>
+<noscript>
+  <img height="1" width="1" style="display:none"
+       src="https://www.facebook.com/tr?id=807233935229656&ev=PageView&noscript=1"/>
+</noscript>
+<!-- End Meta Pixel Code -->
 
 
 
@@ -789,24 +786,25 @@
         // ===== CONFIGURAÇÕES =====
         const WHATSAPP_NUMBER = '5577999708113'; // SUBSTITUA AQUI
 
-
+        const dedupId = localStorage.getItem('event_id_initiate') || null;
 
         // ===== INICIALIZAÇÃO =====
         document.addEventListener('DOMContentLoaded', function() {
+            firePurchaseEvent();
             loadUserData();
             startCountdown();
             initializeAnimations();
+                
             
-            // Pixel events
-            fbq('track', 'ViewContent', {
-                content_name: 'Pagina Sucesso - Cadastro Confirmado',
-                content_category: 'Success Page'
+            // Dispara eventos principais
+            fbq('track', 'PageView');
+            fbq('trackCustom', 'Registration_Success', {
+            page: 'obrigado.html',
+            status: 'success',
+            timestamp: new Date().toISOString()
             });
-            
             setTimeout(() => {
-                fbq('track', 'Custom', {
-                    event_name: 'Success_Page_Engagement_30s'
-                });
+            fbq('trackCustom', 'SuccessPageEngagement', { timeOnPage: 30 });
             }, 30000);
         });
 
@@ -1083,6 +1081,15 @@
             });
         }
 
+        // Rastreamento de engajamento
+        window.addEventListener('scroll', () => {
+        if (typeof fbq !== 'undefined') fbq('trackCustom', 'SuccessPageScroll');
+        });
+
+        window.addEventListener('beforeunload', () => {
+        if (typeof fbq !== 'undefined') fbq('trackCustom', 'SuccessPageExit');
+        });
+
 
 
         // ===== EMERGENCY CONTACT =====
@@ -1160,20 +1167,12 @@
 
 
 
-        // ===== CONSOLE LOG =====
         console.log(`
-        🎉 PÁGINA DE SUCESSO ATIVA - FURION POWER
-        ✅ Cadastro confirmado e funcionando
-        ⏰ Countdown timer ativo
-        🎊 Animações de celebração rodando
-        📱 Botões de contato configurados
-        
-        Configurações:
-        - WHATSAPP_NUMBER: ${WHATSAPP_NUMBER}
-        - Pixel configurado e rastreando
-        - Dados do usuário carregados
-        
-        🚀 CONVERSÃO FINALIZADA COM SUCESSO!
+        🎉 PÁGINA DE SUCESSO ATIVA
+        ✅ Eventos Pixel configurados (PageView, Registration_Success, Purchase)
+        📡 CAPI configurada e aguardando integração total
+        💾 Dados carregados de localStorage.userData
+        🚀 Tudo pronto para aprendizado do pixel e deduplicação
         `);
 
 
@@ -1183,6 +1182,71 @@
         window.onpopstate = function() {
             history.go(1);
         };
+
+function firePurchaseEvent() {
+  // evita disparo múltiplo (por reload)
+  if (localStorage.getItem('purchase_fired')) {
+    console.log('⚠️ Purchase já disparado. Pulando...');
+    return;
+  }
+
+  if (typeof fbq === 'undefined') {
+    console.warn('⚠️ fbq não disponível — Purchase não será disparado no client.');
+    return;
+  }
+
+  // gera um event_id único
+  const eventId = 'purchase_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+
+  // Pixel (client-side)
+  fbq('track', 'Purchase', {
+    content_ids: ['inss_maternidade_consultoria'],
+    content_name: 'Consultoria INSS Maternidade',
+    content_type: 'service',
+    value: 0.00,
+    currency: 'BRL'
+  }, { eventID: eventId });
+
+  // marca como disparado
+  try { localStorage.setItem('purchase_fired', eventId); } catch (e) {}
+
+  // ===== Server-side (CAPI) =====
+  const userData = JSON.parse(localStorage.getItem('userData')) || {};
+
+  fetch("https://capi-api.onrender.com/event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      event_name: "Purchase",
+      event_id: eventId,
+      event_source_url: window.location.href,
+      user: {
+        name: userData.name || "",
+        email: userData.email || "",
+        fbp: userData.fbp || "",
+        fbc: userData.fbc || ""
+      },
+      custom_data: {
+        content_ids: ["inss_maternidade_consultoria"],
+        content_name: "Consultoria INSS Maternidade",
+        content_type: "service",
+        value: 0.00,
+        currency: "BRL"
+      }
+    })
+  })
+  .then(r => r.json())
+  .then(j => {
+    console.log('📡 CAPI Purchase resp', j);
+
+    // Limpa dados temporários após conversão bem-sucedida
+    localStorage.removeItem('userData');
+    localStorage.removeItem('event_id_initiate');
+    localStorage.removeItem('purchase_fired');
+  })
+  .catch(e => console.error('❌ CAPI Purchase error', e));
+}
+
     </script>
 </body>
 </html>

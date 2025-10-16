@@ -31,21 +31,27 @@
 
 
 
-    <!-- PIXEL DO FACEBOOK -->
-    <script>
-        !function(f,b,e,v,n,t,s)
-        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-        n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t,s)}(window, document,'script',
-        'https://connect.facebook.net/en_US/fbevents.js');
-        
-        fbq('init', 'SEU_PIXEL_ID'); // SUBSTITUA AQUI
-        fbq('track', 'PageView');
-    </script>
-    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=SEU_PIXEL_ID&ev=PageView&noscript=1"/></noscript>
+<!-- ===================== META PIXEL CODE ===================== -->
+<script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  
+  fbq('init', '807233935229656'); // PIXEL ATUAL
+  fbq('track', 'PageView');
+  console.log('📊 Pixel PageView ativo - ID 807233935229656');
+</script>
+
+<noscript>
+  <img height="1" width="1" style="display:none"
+       src="https://www.facebook.com/tr?id=807233935229656&ev=PageView&noscript=1"/>
+</noscript>
+<!-- =================== FIM DO META PIXEL CODE =================== -->
 
 
 
@@ -2061,11 +2067,16 @@
 
         // ===== CONFIGURAÇÕES =====
         const CONFIG = {
-            PIXEL_ID: 'SEU_PIXEL_ID', // SUBSTITUA AQUI
+            PIXEL_ID: '807233935229656', // SUBSTITUA AQUI
             WHATSAPP_NUMBER: '5577999708113', // SUBSTITUA AQUI
             VIDEO_URL: 'video.mp4', // SUBSTITUA PELA URL DO SEU VSL
-            GA_ID: 'GA_MEASUREMENT_ID' // SUBSTITUA AQUI SE USAR GA4
+            GA_ID: 'GA_MEASUREMENT_ID', // SUBSTITUA AQUI SE USAR GA4
+            capiEndpoint: 'https://capi-api.onrender.com/event' // placeholder (usado depois)
         };
+
+         // Gera eventId único para correlação client <> server
+        const eventId = 'evt_' + Date.now() + '_' + Math.floor(Math.random()*100000);
+
 
 
 
@@ -2303,31 +2314,29 @@ document.querySelector('.video-overlay').addEventListener('click', function() {
 
         // ===== EVENT LISTENERS =====
         function setupEventListeners() {
-            // CTA Button clicks
+            // CTA Button clicks (Lead padrão Stream)
             elements.ctaButtons.forEach(button => {
                 button.addEventListener('click', function(e) {
                     const buttonText = this.textContent.trim();
-                    
-                    // Pixel tracking
-                    fbq('track', 'InitiateCheckout', {
-                        content_name: 'Clique CTA - ' + buttonText,
-                        content_category: 'Button Click',
-                        value: 2000.00,
-                        currency: 'BRL'
-                    });
 
-
+                    // 🔹 Dispara evento Lead — padrão do projeto Stream
+                    if (typeof fbq !== 'undefined') {
+                        fbq('track', 'Lead', {
+                            content_name: 'Clique CTA - ' + buttonText,
+                            content_category: 'Engajamento'
+                        });
+                        console.log('🎯 Evento Lead disparado:', buttonText);
+                    }
 
                     // Google Analytics (se configurado)
                     if (typeof gtag !== 'undefined') {
-                        gtag('event', 'click', {
+                        gtag('event', 'lead', {
                             event_category: 'CTA Button',
-                            event_label: buttonText,
-                            value: 2000
+                            event_label: buttonText
                         });
                     }
                 });
-                  });
+            });
 
 
 

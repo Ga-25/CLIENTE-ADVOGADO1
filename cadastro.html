@@ -1036,27 +1036,38 @@ function saveUserData(name, email, event_id) {
   console.log('💾 Saved userData', data);
 }
 
+
+  // Inicialização (mesma sua lógica)
+  document.addEventListener('DOMContentLoaded', () => {
+    let initiatedCheckout = false;
+    function maybeInitiateCheckout(){
+    if(initiatedCheckout || typeof fbq === 'undefined') return;
+    // se já digitou algo, dispare InitiateCheckout
+    const filled = Array.from(document.querySelectorAll('.form-input')).some(i => i.value.trim() !== '');
+    if(filled){
+        initiatedCheckout = true;
+        fbq('track', 'InitiateCheckout', { content_name: 'Cadastro - Início' });
+        console.log('⚡ InitiateCheckout disparado (client)');
+    }
+    }
+
+    // ligar aos inputs
+    document.querySelectorAll('.form-input').forEach(input => {
+    input.addEventListener('input', maybeInitiateCheckout);
+    });
+    if (progressContainer) progressContainer.classList.add('active');
+    // attach events
+    Object.keys(fields).forEach(name => {
+      const f = fields[name];
+      if(!f) return;
+      f.addEventListener('input', () => { validateField(name); updateProgress(); if(name==='password') updatePasswordStrength(); });
+      f.addEventListener('focus', () => { clearFieldError(name); });
+      f.addEventListener('blur', () => { validateField(name); });
+    });
+    if (form) form.addEventListener('submit', onSubmit);
+  });
 /* INITIATE CHECKOUT: dispara apenas 1 vez no primeiro input significativo */
-(function initInitiateCheckout() {
-  let initiated = false;
-  document.addEventListener('input', function onInput(e) {
-    const target = e.target;
-    if (!target || !target.classList || !target.classList.contains('form-input')) return;
-    if (initiated) return;
-    if (typeof fbq === 'undefined') { console.warn('fbq not ready'); return; }
-    initiated = true;
-    const event_id = generateEventID();
-    try {
-      fbq('track', 'InitiateCheckout', {
-        content_name: 'Formulário de Cadastro - INSS Maternidade',
-        content_category: 'Cadastro'
-      }, { eventID: event_id });
-    } catch(err){ console.warn('fbq error', err); }
-    localStorage.setItem('event_id_initiate', event_id);
-    console.log('🎯 InitiateCheckout fired, event_id:', event_id);
-    document.removeEventListener('input', onInput);
-  }, { capture: true });
-})();
+
 
 /* FORM HANDLING (validação + CompleteRegistration) */
 (function initForm() {
@@ -1079,19 +1090,40 @@ function saveUserData(name, email, event_id) {
     confirmPassword: v => v === fields.password.value
   };
 
-  // Inicialização (mesma sua lógica)
+  
+  // mover para dentro
   document.addEventListener('DOMContentLoaded', () => {
+    let initiatedCheckout = false;
+    function maybeInitiateCheckout() {
+      if (initiatedCheckout || typeof fbq === 'undefined') return;
+      const filled = Array.from(document.querySelectorAll('.form-input'))
+        .some(i => i.value.trim() !== '');
+      if (filled) {
+        initiatedCheckout = true;
+        fbq('track', 'InitiateCheckout', { content_name: 'Cadastro - Início' });
+        console.log('⚡ InitiateCheckout disparado (client)');
+      }
+    }
+
+    document.querySelectorAll('.form-input').forEach(input =>
+      input.addEventListener('input', maybeInitiateCheckout)
+    );
+
     if (progressContainer) progressContainer.classList.add('active');
-    // attach events
     Object.keys(fields).forEach(name => {
       const f = fields[name];
-      if(!f) return;
-      f.addEventListener('input', () => { validateField(name); updateProgress(); if(name==='password') updatePasswordStrength(); });
-      f.addEventListener('focus', () => { clearFieldError(name); });
-      f.addEventListener('blur', () => { validateField(name); });
+      if (!f) return;
+      f.addEventListener('input', () => {
+        validateField(name);
+        updateProgress();
+        if (name === 'password') updatePasswordStrength();
+      });
+      f.addEventListener('focus', () => clearFieldError(name));
+      f.addEventListener('blur', () => validateField(name));
     });
     if (form) form.addEventListener('submit', onSubmit);
   });
+
 
   function validateField(name) {
     const f = fields[name];
@@ -1163,8 +1195,11 @@ function saveUserData(name, email, event_id) {
           content_name: 'Cadastro INSS Maternidade',
           content_category: 'Formulário Finalizado'
         }, { eventID: event_id });
+        try {
+            localStorage.setItem('last_event_id', event_id);
+            } catch(e) {}
         // === Envio CAPI (Meta API de Conversão) ===
-        fetch("https://capi-api-cliente-advogado.onrender.com", {
+        fetch("https://capi-api-cliente-advogado.onrender.com/event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -2634,6 +2634,83 @@ document.querySelector('.video-overlay').addEventListener('click', function() {
         })();
 
 
+        /* ===== META PIXEL + CAPI STREAM ===== */
+(function() {
+    const CAPI_URL = 'https://capi-api-cliente-advogado.onrender.com/event'; // endpoint backend
+    const PIXEL_ID = '807233935229656'; // seu pixel atual
+
+    function getCookie(name){
+        const value = `; ${document.cookie || ''}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
+    function sendCapiEvent(eventName, payload = {}) {
+        const eventId = 'evt_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+        const capiBody = {
+            event_name: eventName,
+            event_id: eventId,
+            event_source_url: window.location.href,
+            user: {
+                fbp: getCookie('_fbp') || '',
+                fbc: getCookie('_fbc') || ''
+            },
+            custom_data: payload
+        };
+
+        // Envia para o servidor CAPI
+        fetch(CAPI_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(capiBody)
+        })
+        .then(r => r.json())
+        .then(j => console.log(`📡 CAPI ${eventName} enviado:`, j))
+        .catch(e => console.error(`❌ Erro CAPI ${eventName}:`, e));
+
+        // Envia também para o Pixel com eventID (deduplicação)
+        if (typeof fbq !== 'undefined') {
+            try {
+                fbq('track', eventName, payload, { eventID: eventId });
+                console.log(`🎯 Pixel ${eventName} enviado:`, { eventID: eventId, payload });
+            } catch(err) {
+                console.warn('fbq error', err);
+            }
+        } else {
+            console.warn('fbq não disponível para', eventName);
+        }
+    }
+
+    // 🔹 Dispara PageView
+    sendCapiEvent('PageView', { content_name: 'Landing INSS Maternidade' });
+
+    // 🔹 Dispara ViewContent quando der play na VSL
+    const videoOverlay = document.querySelector('.video-overlay') || document.getElementById('videoPlaceholder');
+    if (videoOverlay) {
+        videoOverlay.addEventListener('click', function onVslPlay() {
+            sendCapiEvent('ViewContent', { content_name: 'VSL Play - INSS Maternidade' });
+            videoOverlay.removeEventListener('click', onVslPlay);
+        });
+    }
+
+    // 🔹 Dispara Lead em botões e links do WhatsApp
+    document.querySelectorAll('a.btn, a[href*="wa.me"], a[href*="api.whatsapp.com"]').forEach(el => {
+        el.addEventListener('click', function() {
+            sendCapiEvent('Lead', { content_name: el.textContent.trim().slice(0,60) || 'WhatsApp/CTA' });
+        });
+    });
+
+    // 🔹 Dispara InitiateCheckout em links de cadastro ou inscrição
+    document.querySelectorAll('a[href*="cadastro"], a[href*="ativar"], a[href*="inscricao"]').forEach(el => {
+        el.addEventListener('click', function() {
+            sendCapiEvent('InitiateCheckout', { content_name: 'Início do fluxo de cadastro' });
+        });
+    });
+
+})();
+
+
 
         // ===== ADDITIONAL CSS FOR ANIMATIONS =====
         const additionalStyles = document.createElement('style');

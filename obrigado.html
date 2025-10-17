@@ -1216,7 +1216,7 @@ function firePurchaseEvent() {
   // ===== Server-side (CAPI) =====
   const userData = JSON.parse(localStorage.getItem('userData')) || {};
 
-  fetch("https://capi-api.onrender.com/event", {
+  fetch("https://capi-api-cliente-advogado.onrender.com", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

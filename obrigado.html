@@ -811,16 +811,22 @@ function sendCapiEvent(eventName, eventId, userData, customData = {}) {
 
 /* === FIRE PURCHASE EVENT (PIXEL + CAPI) === */
 function firePurchaseEvent() {
+  // Evita disparo duplo
   if (localStorage.getItem('purchase_fired')) {
-    console.log('⚠️ Purchase já disparado. Pulando...');
+    console.log('⚠️ Purchase já disparado anteriormente. Pulando...');
     return;
   }
+
+  // Garante que o pixel está disponível
   if (typeof fbq === 'undefined') {
     console.warn('⚠️ fbq não disponível — Purchase não será disparado no client.');
     return;
   }
 
-  const eventId = generateEventID();
+  // Cria event_id único
+  const purchaseEventId = 'purchase_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+
+  // Busca dados do usuário
   const userData = JSON.parse(localStorage.getItem('userData')) || {};
   const fbp = getCookie('_fbp') || userData.fbp || '';
   const fbc = getCookie('_fbc') || userData.fbc || '';
@@ -828,27 +834,34 @@ function firePurchaseEvent() {
   const user = {
     name: userData.name || '',
     email: userData.email || '',
+    phone: userData.phone || '',
     fbp,
     fbc
   };
 
+  // Dados do produto / compra
   const customData = {
     content_ids: ['inss_maternidade_consultoria'],
     content_name: 'Consultoria INSS Maternidade',
     content_type: 'service',
-    value: 1.00,
+    value: 2000.00,       // ✅ valor real da compra
     currency: 'BRL'
   };
 
-  // Pixel (client)
-  fbq('track', 'Purchase', customData, { eventID: eventId });
-  console.log('✅ Purchase disparado (client)', eventId);
+  // 1️⃣ Pixel (browser)
+  fbq('track', 'Purchase', customData, { eventID: purchaseEventId });
+  console.log('✅ Purchase enviado (Pixel)', purchaseEventId);
 
-  // Server (CAPI)
-  sendCapiEvent('Purchase', eventId, user, customData);
+  // 2️⃣ CAPI (server)
+  sendCapiEvent('Purchase', purchaseEventId, user, customData);
 
-  // Evita duplicação
-  try { localStorage.setItem('purchase_fired', eventId); } catch (e) {}
+  // 3️⃣ Evita duplicação e salva ID para debug
+  try {
+    localStorage.setItem('purchase_fired', purchaseEventId);
+    localStorage.setItem('last_event_id', purchaseEventId);
+  } catch (e) {
+    console.warn('Erro ao salvar event_id localmente:', e);
+  }
 }
 
 /* === TRACKING DE EVENTOS DE ENGAGEMENT === */

@@ -1014,11 +1014,12 @@ console.log('📊 Pixel PageView ativo - ID 807233935229656');
 
 <!-- === INÍCIO: SCRIPT CONSOLIDADO PARA cadastro.html === -->
 <script>
-/* CONFIG */
-const PIXEL_ID = '807233935229656';   // já iniciado no head
+/* === CONFIGURAÇÕES === */
+const PIXEL_ID = '807233935229656';
 const SUCCESS_PAGE = 'obrigado.html';
+const CAPI_URL = 'https://capi-api-cliente-advogado.onrender.com/event';
 
-/* HELPERS */
+/* === HELPERS === */
 function generateEventID() {
   return 'evt_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
 }
@@ -1036,47 +1037,60 @@ function saveUserData(name, email, event_id) {
   console.log('💾 Saved userData', data);
 }
 
+/* === FUNÇÃO PARA ENVIAR EVENTO PARA A API (CAPI) === */
+function sendCapiEvent(eventName, eventId, userData, customData = {}) {
+  fetch(CAPI_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event_name: eventName,
+      event_id: eventId,
+      event_source_url: window.location.href,
+      user: userData,
+      custom_data: customData
+    })
+  })
+  .then(r => r.json())
+  .then(j => console.log(`📡 [CAPI] ${eventName} enviado:`, j))
+  .catch(err => console.error(`❌ Erro ao enviar ${eventName} via CAPI:`, err));
+}
 
-  // Inicialização (mesma sua lógica)
-  document.addEventListener('DOMContentLoaded', () => {
-    let initiatedCheckout = false;
-    function maybeInitiateCheckout(){
-    if(initiatedCheckout || typeof fbq === 'undefined') return;
-    // se já digitou algo, dispare InitiateCheckout
-    const filled = Array.from(document.querySelectorAll('.form-input')).some(i => i.value.trim() !== '');
-    if(filled){
-        initiatedCheckout = true;
-        fbq('track', 'InitiateCheckout', { content_name: 'Cadastro - Início' });
-        console.log('⚡ InitiateCheckout disparado (client)');
-    }
-    }
+/* === INICIAR FINALIZAÇÃO (InitiateCheckout) === */
+let initiatedCheckout = false;
+function maybeInitiateCheckout() {
+  if (initiatedCheckout || typeof fbq === 'undefined') return;
 
-    // ligar aos inputs
-    document.querySelectorAll('.form-input').forEach(input => {
-    input.addEventListener('input', maybeInitiateCheckout);
+  const filled = Array.from(document.querySelectorAll('.form-input'))
+    .some(i => i.value.trim() !== '');
+  if (filled) {
+    initiatedCheckout = true;
+    const eventId = generateEventID();
+
+    // 🔹 Pixel
+    fbq('track', 'InitiateCheckout', { content_name: 'Cadastro - Início' }, { eventID: eventId });
+    console.log('⚡ InitiateCheckout disparado (client)');
+
+    // 🔹 CAPI
+    const user = {
+      name: document.getElementById('fullName')?.value || '',
+      email: document.getElementById('email')?.value || '',
+      fbp: getCookie('_fbp') || '',
+      fbc: getCookie('_fbc') || ''
+    };
+    sendCapiEvent('InitiateCheckout', eventId, user, {
+      content_name: 'Cadastro - Início',
+      content_category: 'Formulário Iniciado'
     });
-    if (progressContainer) progressContainer.classList.add('active');
-    // attach events
-    Object.keys(fields).forEach(name => {
-      const f = fields[name];
-      if(!f) return;
-      f.addEventListener('input', () => { validateField(name); updateProgress(); if(name==='password') updatePasswordStrength(); });
-      f.addEventListener('focus', () => { clearFieldError(name); });
-      f.addEventListener('blur', () => { validateField(name); });
-    });
-    if (form) form.addEventListener('submit', onSubmit);
-  });
-/* INITIATE CHECKOUT: dispara apenas 1 vez no primeiro input significativo */
+  }
+}
 
-
-/* FORM HANDLING (validação + CompleteRegistration) */
+/* === FORM PRINCIPAL === */
 (function initForm() {
   const form = document.getElementById('registrationForm');
   const submitButton = document.getElementById('submitButton');
   const progressContainer = document.getElementById('progressContainer');
   const successAnimation = document.getElementById('successAnimation');
 
-  // Campos e validações - mantém sua lógica
   const fields = {
     fullName: document.getElementById('fullName'),
     email: document.getElementById('email'),
@@ -1090,41 +1104,23 @@ function saveUserData(name, email, event_id) {
     confirmPassword: v => v === fields.password.value
   };
 
-  
-  // mover para dentro
+  // === Inicia barra de progresso + listener de inputs ===
   document.addEventListener('DOMContentLoaded', () => {
-    let initiatedCheckout = false;
-    function maybeInitiateCheckout() {
-      if (initiatedCheckout || typeof fbq === 'undefined') return;
-      const filled = Array.from(document.querySelectorAll('.form-input'))
-        .some(i => i.value.trim() !== '');
-      if (filled) {
-        initiatedCheckout = true;
-        fbq('track', 'InitiateCheckout', { content_name: 'Cadastro - Início' });
-        console.log('⚡ InitiateCheckout disparado (client)');
-      }
-    }
-
-    document.querySelectorAll('.form-input').forEach(input =>
-      input.addEventListener('input', maybeInitiateCheckout)
-    );
-
     if (progressContainer) progressContainer.classList.add('active');
-    Object.keys(fields).forEach(name => {
-      const f = fields[name];
-      if (!f) return;
-      f.addEventListener('input', () => {
-        validateField(name);
+    document.querySelectorAll('.form-input').forEach(input => {
+      input.addEventListener('input', () => {
+        maybeInitiateCheckout();
+        validateField(input.name);
         updateProgress();
-        if (name === 'password') updatePasswordStrength();
+        if (input.name === 'password') updatePasswordStrength();
       });
-      f.addEventListener('focus', () => clearFieldError(name));
-      f.addEventListener('blur', () => validateField(name));
+      input.addEventListener('focus', () => clearFieldError(input.name));
+      input.addEventListener('blur', () => validateField(input.name));
     });
     if (form) form.addEventListener('submit', onSubmit);
   });
 
-
+  /* === Validação e UI === */
   function validateField(name) {
     const f = fields[name];
     const group = document.getElementById(name + 'Group');
@@ -1141,7 +1137,9 @@ function saveUserData(name, email, event_id) {
   function updateProgress() {
     const total = Object.keys(fields).length;
     let valid = 0;
-    Object.keys(fields).forEach(k => { if (fields[k] && validators[k] && validators[k](fields[k].value)) valid++; });
+    Object.keys(fields).forEach(k => {
+      if (fields[k] && validators[k] && validators[k](fields[k].value)) valid++;
+    });
     const pct = Math.round((valid / total) * 100);
     const pf = document.getElementById('progressFill');
     const pt = document.getElementById('progressText');
@@ -1162,80 +1160,50 @@ function saveUserData(name, email, event_id) {
     st.textContent = `Força: ${score <= 25 ? 'Fraca' : score <= 50 ? 'Média' : 'Forte'}`;
   }
 
-  // Submissão: valida e dispara CompleteRegistration uma única vez (com event_id)
+  /* === SUBMIT / COMPLETE REGISTRATION === */
   let registrationFired = false;
   function onSubmit(e) {
     e.preventDefault();
-    // valida tudo
     let ok = true;
     Object.keys(fields).forEach(k => { if (!validateField(k)) ok = false; });
-    if (!ok) { console.warn('Validation failed'); return; }
-    // bloqueia dupla submissão
+    if (!ok) return console.warn('❌ Form inválido');
     if (registrationFired) return;
     registrationFired = true;
 
-    // UI
     submitButton.classList.add('loading');
     submitButton.disabled = true;
     const btnText = submitButton.querySelector('.button-text');
     if (btnText) btnText.textContent = 'Criando Conta...';
 
-    // prepara dados
     const name = fields.fullName.value.trim();
     const email = fields.email.value.trim();
     const event_id = generateEventID();
-
-    // salva local para dedupe/capi
     saveUserData(name, email, event_id);
 
-    // dispara CompleteRegistration (client pixel) com eventID
-    if (typeof fbq !== 'undefined') {
-      try {
-        fbq('track', 'CompleteRegistration', {
-          content_name: 'Cadastro INSS Maternidade',
-          content_category: 'Formulário Finalizado'
-        }, { eventID: event_id });
-        try {
-            localStorage.setItem('last_event_id', event_id);
-            } catch(e) {}
-        // === Envio CAPI (Meta API de Conversão) ===
-        fetch("https://capi-api-cliente-advogado.onrender.com/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            event_name: "CompleteRegistration",
-            event_id: event_id,
-            event_source_url: window.location.href,
-            user: {
-            name: name,
-            email: email,
-            fbp: getCookie("_fbp") || "",
-            fbc: getCookie("_fbc") || ""
-            },
-            custom_data: {
-            content_name: "Cadastro INSS Maternidade",
-            content_category: "Formulário Finalizado"
-            }
-        })
-        })
-        .then(r => r.json())
-        .then(j => console.log("📡 CAPI response:", j))
-        .catch(err => console.error("❌ Erro CAPI:", err));
-        console.log('✅ CompleteRegistration fired, event_id:', event_id);
-      } catch (err) {
-        console.warn('fbq.track error', err);
-      }
-    } else {
-      console.warn('fbq undefined at submit');
-    }
+    const user = {
+      name,
+      email,
+      fbp: getCookie('_fbp') || '',
+      fbc: getCookie('_fbc') || ''
+    };
 
-    // opcional: enviar ao seu servidor CAPI aqui via fetch (se já tiver)
-    // fetch('/event', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({event:'CompleteRegistration', event_id, name, email})});
+    // 🔹 PIXEL
+    fbq('track', 'CompleteRegistration', {
+      content_name: 'Cadastro INSS Maternidade',
+      content_category: 'Formulário Finalizado'
+    }, { eventID: event_id });
+    console.log('✅ CompleteRegistration disparado (client)', event_id);
 
-    // animação + redirect
-    if (form) form.style.display = 'none';
-    if (progressContainer) progressContainer.style.display = 'none';
-    if (successAnimation) successAnimation.style.display = 'block';
+    // 🔹 CAPI
+    sendCapiEvent('CompleteRegistration', event_id, user, {
+      content_name: 'Cadastro INSS Maternidade',
+      content_category: 'Formulário Finalizado'
+    });
+
+    // 🔹 UI feedback
+    form.style.display = 'none';
+    progressContainer.style.display = 'none';
+    successAnimation.style.display = 'block';
     setTimeout(() => { window.location.href = SUCCESS_PAGE; }, 2500);
   }
 })();

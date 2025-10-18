@@ -1180,6 +1180,8 @@ function maybeInitiateCheckout() {
     const event_id = generateEventID();
     saveUserData(name, email, event_id);
 
+    localStorage.setItem('last_event_id', event_id);
+
     const user = {
       name,
       email,

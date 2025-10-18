@@ -820,7 +820,7 @@ function firePurchaseEvent() {
     return;
   }
 
-  const eventId = generateEventID();
+  const eventId = localStorage.getItem('last_event_id') || generateEventID();
   const userData = JSON.parse(localStorage.getItem('userData')) || {};
   const fbp = getCookie('_fbp') || userData.fbp || '';
   const fbc = getCookie('_fbc') || userData.fbc || '';

@@ -775,13 +775,14 @@ fbq('track', 'PageView');
 
     <!-- JAVASCRIPT -->
 <script>
-/* CONFIG */
-const PIXEL_ID = '807233935229656';   // já iniciado no head
-const SUCCESS_PAGE = 'obrigado.html';
+/* === CONFIGURAÇÕES === */
+const PIXEL_ID = '807233935229656'; 
+const CAPI_URL = 'https://capi-api-cliente-advogado.onrender.com/event';
+const WHATSAPP_NUMBER = '5577999708113';
 
-/* HELPERS */
+/* === HELPERS === */
 function generateEventID() {
-  return 'evt_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+  return 'purchase_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
 }
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -789,217 +790,226 @@ function getCookie(name) {
   if (parts.length === 2) return parts.pop().split(';').shift();
   return '';
 }
-function saveUserData(name, email, event_id) {
-  const fbp = getCookie('_fbp') || '';
-  const fbc = getCookie('_fbc') || '';
-  const data = { name, email, event_id, fbp, fbc, timestamp: new Date().toISOString() };
-  try { localStorage.setItem('userData', JSON.stringify(data)); } catch(e){}
-  console.log('💾 Saved userData', data);
+
+/* === CAPI EVENT SENDER === */
+function sendCapiEvent(eventName, eventId, userData, customData = {}) {
+  fetch(CAPI_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event_name: eventName,
+      event_id: eventId,
+      event_source_url: window.location.href,
+      user: userData,
+      custom_data: customData
+    })
+  })
+    .then(r => r.json())
+    .then(j => console.log(`📡 [CAPI] ${eventName} enviado:`, j))
+    .catch(err => console.error(`❌ Erro ao enviar ${eventName} via CAPI:`, err));
 }
 
+/* === FIRE PURCHASE EVENT (PIXEL + CAPI) === */
+function firePurchaseEvent() {
+  if (localStorage.getItem('purchase_fired')) {
+    console.log('⚠️ Purchase já disparado. Pulando...');
+    return;
+  }
+  if (typeof fbq === 'undefined') {
+    console.warn('⚠️ fbq não disponível — Purchase não será disparado no client.');
+    return;
+  }
 
-  // Inicialização (mesma sua lógica)
-  document.addEventListener('DOMContentLoaded', () => {
-    let initiatedCheckout = false;
-    function maybeInitiateCheckout(){
-    if(initiatedCheckout || typeof fbq === 'undefined') return;
-    // se já digitou algo, dispare InitiateCheckout
-    const filled = Array.from(document.querySelectorAll('.form-input')).some(i => i.value.trim() !== '');
-    if(filled){
-        initiatedCheckout = true;
-        fbq('track', 'InitiateCheckout', { content_name: 'Cadastro - Início' });
-        console.log('⚡ InitiateCheckout disparado (client)');
-    }
-    }
+  const eventId = generateEventID();
+  const userData = JSON.parse(localStorage.getItem('userData')) || {};
+  const fbp = getCookie('_fbp') || userData.fbp || '';
+  const fbc = getCookie('_fbc') || userData.fbc || '';
 
-    // ligar aos inputs
-    document.querySelectorAll('.form-input').forEach(input => {
-    input.addEventListener('input', maybeInitiateCheckout);
-    });
-    if (progressContainer) progressContainer.classList.add('active');
-    // attach events
-    Object.keys(fields).forEach(name => {
-      const f = fields[name];
-      if(!f) return;
-      f.addEventListener('input', () => { validateField(name); updateProgress(); if(name==='password') updatePasswordStrength(); });
-      f.addEventListener('focus', () => { clearFieldError(name); });
-      f.addEventListener('blur', () => { validateField(name); });
-    });
-    if (form) form.addEventListener('submit', onSubmit);
-  });
-/* INITIATE CHECKOUT: dispara apenas 1 vez no primeiro input significativo */
-
-
-/* FORM HANDLING (validação + CompleteRegistration) */
-(function initForm() {
-  const form = document.getElementById('registrationForm');
-  const submitButton = document.getElementById('submitButton');
-  const progressContainer = document.getElementById('progressContainer');
-  const successAnimation = document.getElementById('successAnimation');
-
-  // Campos e validações - mantém sua lógica
-  const fields = {
-    fullName: document.getElementById('fullName'),
-    email: document.getElementById('email'),
-    password: document.getElementById('password'),
-    confirmPassword: document.getElementById('confirmPassword')
-  };
-  const validators = {
-    fullName: v => v && v.trim().length >= 3 && /\s/.test(v),
-    email: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-    password: v => v && v.length >= 6,
-    confirmPassword: v => v === fields.password.value
+  const user = {
+    name: userData.name || '',
+    email: userData.email || '',
+    fbp,
+    fbc
   };
 
-  
-  // mover para dentro
-  document.addEventListener('DOMContentLoaded', () => {
-    let initiatedCheckout = false;
-    function maybeInitiateCheckout() {
-      if (initiatedCheckout || typeof fbq === 'undefined') return;
-      const filled = Array.from(document.querySelectorAll('.form-input'))
-        .some(i => i.value.trim() !== '');
-      if (filled) {
-        initiatedCheckout = true;
-        fbq('track', 'InitiateCheckout', { content_name: 'Cadastro - Início' });
-        console.log('⚡ InitiateCheckout disparado (client)');
-      }
-    }
+  const customData = {
+    content_ids: ['inss_maternidade_consultoria'],
+    content_name: 'Consultoria INSS Maternidade',
+    content_type: 'service',
+    value: 1.00,
+    currency: 'BRL'
+  };
 
-    document.querySelectorAll('.form-input').forEach(input =>
-      input.addEventListener('input', maybeInitiateCheckout)
-    );
+  // Pixel (client)
+  fbq('track', 'Purchase', customData, { eventID: eventId });
+  console.log('✅ Purchase disparado (client)', eventId);
 
-    if (progressContainer) progressContainer.classList.add('active');
-    Object.keys(fields).forEach(name => {
-      const f = fields[name];
-      if (!f) return;
-      f.addEventListener('input', () => {
-        validateField(name);
-        updateProgress();
-        if (name === 'password') updatePasswordStrength();
-      });
-      f.addEventListener('focus', () => clearFieldError(name));
-      f.addEventListener('blur', () => validateField(name));
-    });
-    if (form) form.addEventListener('submit', onSubmit);
+  // Server (CAPI)
+  sendCapiEvent('Purchase', eventId, user, customData);
+
+  // Evita duplicação
+  try { localStorage.setItem('purchase_fired', eventId); } catch (e) {}
+}
+
+/* === TRACKING DE EVENTOS DE ENGAGEMENT === */
+function trackEngagement() {
+  if (typeof fbq === 'undefined') return;
+
+  fbq('trackCustom', 'Registration_Success', {
+    page: 'obrigado.html',
+    status: 'success',
+    timestamp: new Date().toISOString()
   });
 
+  setTimeout(() => fbq('trackCustom', 'SuccessPageEngagement', { timeOnPage: 30 }), 30000);
 
-  function validateField(name) {
-    const f = fields[name];
-    const group = document.getElementById(name + 'Group');
-    if (!f || !group) return false;
-    const ok = !!(validators[name] && validators[name](f.value));
-    group.classList.toggle('valid', ok);
-    group.classList.toggle('error', !ok);
-    return ok;
+  let scrolled = false;
+  window.addEventListener('scroll', () => {
+    if (!scrolled) {
+      scrolled = true;
+      fbq('trackCustom', 'SuccessPageScroll');
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    fbq('trackCustom', 'SuccessPageExit');
+  });
+}
+
+/* === FUNÇÃO PARA INICIALIZAR TUDO === */
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('🚀 Página de sucesso ativa');
+  loadUserName();
+  firePurchaseEvent();
+  startCountdown();
+  trackEngagement();
+  initializeAnimations();
+  setTimeout(showEmergencyContact, 120000);
+});
+
+/* === CARREGA NOME DO USUÁRIO === */
+function loadUserName() {
+  const userData = JSON.parse(localStorage.getItem('userData'));
+  const el = document.getElementById('userName');
+  if (userData && userData.name) {
+    el.textContent = userData.name.split(' ')[0];
+  } else {
+    el.textContent = 'Usuário';
   }
-  function clearFieldError(name) {
-    const group = document.getElementById(name + 'Group');
-    if (group) group.classList.remove('error');
-  }
-  function updateProgress() {
-    const total = Object.keys(fields).length;
-    let valid = 0;
-    Object.keys(fields).forEach(k => { if (fields[k] && validators[k] && validators[k](fields[k].value)) valid++; });
-    const pct = Math.round((valid / total) * 100);
-    const pf = document.getElementById('progressFill');
-    const pt = document.getElementById('progressText');
-    if (pf) pf.style.width = pct + '%';
-    if (pt) pt.textContent = `Progresso: ${pct}%`;
-  }
-  function updatePasswordStrength() {
-    const pw = fields.password.value || '';
-    const sf = document.getElementById('strengthFill');
-    const st = document.getElementById('strengthText');
-    if (!sf || !st) return;
-    let score = 0;
-    if (pw.length >= 6) score += 25;
-    if (pw.length >= 10) score += 25;
-    if (/[A-Z]/.test(pw)) score += 25;
-    if (/\d/.test(pw)) score += 25;
-    sf.style.width = score + '%';
-    st.textContent = `Força: ${score <= 25 ? 'Fraca' : score <= 50 ? 'Média' : 'Forte'}`;
-  }
+}
 
-  // Submissão: valida e dispara CompleteRegistration uma única vez (com event_id)
-  let registrationFired = false;
-  function onSubmit(e) {
-    e.preventDefault();
-    // valida tudo
-    let ok = true;
-    Object.keys(fields).forEach(k => { if (!validateField(k)) ok = false; });
-    if (!ok) { console.warn('Validation failed'); return; }
-    // bloqueia dupla submissão
-    if (registrationFired) return;
-    registrationFired = true;
+/* === CONTAGEM REGRESSIVA === */
+function startCountdown() {
+  let timeLeft = 5 * 60;
+  const minutesEl = document.getElementById('minutes');
+  const secondsEl = document.getElementById('seconds');
 
-    // UI
-    submitButton.classList.add('loading');
-    submitButton.disabled = true;
-    const btnText = submitButton.querySelector('.button-text');
-    if (btnText) btnText.textContent = 'Criando Conta...';
+  const interval = setInterval(() => {
+    const m = Math.floor(timeLeft / 60);
+    const s = timeLeft % 60;
+    minutesEl.textContent = String(m).padStart(2, '0');
+    secondsEl.textContent = String(s).padStart(2, '0');
 
-    // prepara dados
-    const name = fields.fullName.value.trim();
-    const email = fields.email.value.trim();
-    const event_id = generateEventID();
-
-    // salva local para dedupe/capi
-    saveUserData(name, email, event_id);
-
-    // dispara CompleteRegistration (client pixel) com eventID
-    if (typeof fbq !== 'undefined') {
-      try {
-        fbq('track', 'CompleteRegistration', {
-          content_name: 'Cadastro INSS Maternidade',
-          content_category: 'Formulário Finalizado'
-        }, { eventID: event_id });
-        try {
-            localStorage.setItem('last_event_id', event_id);
-            } catch(e) {}
-        // === Envio CAPI (Meta API de Conversão) ===
-        fetch("https://capi-api-cliente-advogado.onrender.com/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            event_name: "CompleteRegistration",
-            event_id: event_id,
-            event_source_url: window.location.href,
-            user: {
-            name: name,
-            email: email,
-            fbp: getCookie("_fbp") || "",
-            fbc: getCookie("_fbc") || ""
-            },
-            custom_data: {
-            content_name: "Cadastro INSS Maternidade",
-            content_category: "Formulário Finalizado"
-            }
-        })
-        })
-        .then(r => r.json())
-        .then(j => console.log("📡 CAPI response:", j))
-        .catch(err => console.error("❌ Erro CAPI:", err));
-        console.log('✅ CompleteRegistration fired, event_id:', event_id);
-      } catch (err) {
-        console.warn('fbq.track error', err);
-      }
-    } else {
-      console.warn('fbq undefined at submit');
+    if (timeLeft <= 60) {
+      minutesEl.style.color = secondsEl.style.color = '#ef4444';
     }
 
-    // opcional: enviar ao seu servidor CAPI aqui via fetch (se já tiver)
-    // fetch('/event', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({event:'CompleteRegistration', event_id, name, email})});
+    if (timeLeft-- <= 0) {
+      clearInterval(interval);
+      showUrgentMessage();
+    }
+  }, 1000);
+}
 
-    // animação + redirect
-    if (form) form.style.display = 'none';
-    if (progressContainer) progressContainer.style.display = 'none';
-    if (successAnimation) successAnimation.style.display = 'block';
-    setTimeout(() => { window.location.href = SUCCESS_PAGE; }, 2500);
+/* === MENSAGEM URGENTE APÓS CONTADOR === */
+function showUrgentMessage() {
+  const countdownSection = document.querySelector('.countdown-section');
+  countdownSection.innerHTML = `
+    <div style="background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);
+      color: white; padding: 20px; border-radius: 12px; text-align: center;">
+      <h3 style="margin-bottom: 12px;">🚨 TEMPO ESGOTADO!</h3>
+      <p style="margin-bottom: 16px;">Não perca mais tempo! Entre em contato agora mesmo.</p>
+      <a href="https://wa.me/${WHATSAPP_NUMBER}?text=Dr. Lucas, perdi o prazo mas preciso da consultoria sobre os R$ 6.000 do INSS!"
+         target="_blank" style="background: white; color: #fc4a1a; padding: 12px 24px;
+         border-radius: 8px; text-decoration: none; font-weight: bold;
+         display: inline-block; transition: all 0.3s;">
+        📱 CONTATO URGENTE
+      </a>
+    </div>`;
+}
+
+/* === EFEITOS E ANIMAÇÕES === */
+function initializeAnimations() {
+  createConfetti();
+  initializeButtonEffects();
+}
+
+function createConfetti() {
+  const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'];
+  for (let i = 0; i < 50; i++) {
+    setTimeout(() => {
+      const c = document.createElement('div');
+      c.style.cssText = `
+        position: fixed; top: -10px; left: ${Math.random() * 100}%;
+        width: 10px; height: 10px; background: ${colors[Math.floor(Math.random() * colors.length)]};
+        border-radius: 50%; animation: confettiFall 3s linear forwards;
+      `;
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 3000);
+    }, i * 80);
   }
-})();
+}
+
+function initializeButtonEffects() {
+  document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const ripple = document.createElement('span');
+      const rect = btn.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      ripple.style.cssText = `
+        position:absolute;width:${size}px;height:${size}px;left:${e.clientX - rect.left - size / 2}px;
+        top:${e.clientY - rect.top - size / 2}px;background:rgba(255,255,255,0.3);
+        border-radius:50%;transform:scale(0);animation:ripple 0.6s ease-out;pointer-events:none;
+      `;
+      btn.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 600);
+    });
+  });
+}
+
+/* === CONTATO DE EMERGÊNCIA === */
+function showEmergencyContact() {
+  const div = document.createElement('div');
+  div.style.cssText = `
+    position: fixed; bottom: 20px; right: 20px;
+    background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);
+    color: white; padding: 16px; border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 1000; cursor: pointer;
+  `;
+  div.innerHTML = `
+    <div style="font-weight: bold;">🆘 Não recebeu contato?</div>
+    <div style="font-size: 0.9rem; margin-bottom: 8px;">Clique aqui para contato emergencial</div>
+    <div style="text-align: center;"><i class="fab fa-whatsapp" style="font-size: 24px;"></i></div>
+  `;
+  div.onclick = () => {
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Dr. Lucas, me cadastrei mas não recebi contato. Preciso da consultoria sobre os R$ 6.000 do INSS!`, '_blank');
+    fbq('trackCustom', 'Emergency_Contact_Click');
+  };
+  document.body.appendChild(div);
+}
+
+/* === ANIMAÇÕES CSS === */
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes confettiFall {
+    to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+  @keyframes ripple {
+    to { transform: scale(2); opacity: 0; }
+  }
+`;
+document.head.appendChild(style);
 </script>
 </body>
 </html>

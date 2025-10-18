@@ -820,17 +820,16 @@ function firePurchaseEvent() {
     return;
   }
 
-  const eventId = localStorage.getItem('last_event_id') || generateEventID();
-  const userData = JSON.parse(localStorage.getItem('userData')) || {};
-  const fbp = getCookie('_fbp') || userData.fbp || '';
-  const fbc = getCookie('_fbc') || userData.fbc || '';
+    const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+    const eventId = userData.event_id || localStorage.getItem("last_event_id") || generateEventID();
 
-  const user = {
-    name: userData.name || '',
-    email: userData.email || '',
-    fbp,
-    fbc
-  };
+    const user = {
+    name: userData.name || "",
+    email: userData.email || "",
+    phone: userData.phone || "",
+    fbp: userData.fbp || getCookie("_fbp") || "",
+    fbc: userData.fbc || getCookie("_fbc") || ""
+    };
 
   const customData = {
     content_ids: ['inss_maternidade_consultoria'],
